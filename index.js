@@ -53,7 +53,7 @@ if (live && !wasLive) {
       chat_id: TELEGRAM_CHAT_ID,
       parse_mode: "HTML",
       text:
-`🔴 <b>Bodun4ik_ почав TikTok LIVE!</b>
+`🔴 <b>Bodun4ik почав TikTok LIVE!</b>
 
 🎮 Заходь підтримати!
 
