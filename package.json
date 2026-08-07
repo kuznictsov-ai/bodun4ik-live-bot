@@ -1,0 +1,8 @@
+{
+  "name": "bodun4ik-live-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "tiktok-live-connector": "^2.4.3"
+  }
+}
