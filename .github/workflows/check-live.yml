@@ -1,9 +1,10 @@
 name: Check TikTok LIVE
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"
   workflow_dispatch:
+
+  schedule:
+    - cron: "*/2 * * * *"
 
 permissions:
   contents: write
@@ -13,26 +14,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Check TikTok LIVE
+      - name: Run bot
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: node index.js
 
       - name: Save state
         run: |
-          git config user.name "Bodun4ik LIVE Bot"
-          git config user.email "actions@github.com"
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+
           git add state.json
-          git diff --cached --quiet || git commit -m "Update LIVE state"
-          git push
+
+          git diff --cached --quiet || (
+            git commit -m "Update live state"
+            git push
+          )
