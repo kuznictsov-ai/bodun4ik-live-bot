@@ -39,7 +39,7 @@ async function isLive() {
   }
 }
 
-const live = await isLive();
+const live = true;
 
 console.log("LIVE:", live);
 
