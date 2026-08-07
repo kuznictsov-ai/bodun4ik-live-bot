@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "tiktok-live-connector": "^2.4.3"
+    "tiktok-live-connector": "1.2.2"
   }
 }
