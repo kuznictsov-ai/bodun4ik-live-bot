@@ -1,51 +1,70 @@
-import { TikTokLiveConnection } from "tiktok-live-connector";
 import fs from "fs";
 
-const TIKTOK_USERNAME = "bodun4ik_";
+const USERNAME = "bodun4ik_";
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const TELEGRAM_CHAT_ID = "@Bodun4ik_Live";
 
-const stateFile = "state.json";
+const STATE_FILE = "state.json";
 
 let wasLive = false;
 
-if (fs.existsSync(stateFile)) {
-  const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
-  wasLive = state.wasLive || false;
+if (fs.existsSync(STATE_FILE)) {
+  try {
+    wasLive = JSON.parse(fs.readFileSync(STATE_FILE)).wasLive ?? false;
+  } catch {}
 }
 
-const connection = new TikTokLiveConnection(TIKTOK_USERNAME);
+async function isLive() {
+  try {
+    const res = await fetch(
+      `https://www.tiktok.com/@${USERNAME}/live`,
+      {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36"
+        }
+      }
+    );
 
-const isLive = await connection.fetchIsLive();
+    const html = await res.text();
 
-console.log(`TikTok LIVE: ${isLive}`);
+    return (
+      html.includes('"status":2') ||
+      html.includes('"LIVE"') ||
+      html.includes('"liveRoomId"')
+    );
+  } catch (e) {
+    console.log(e);
+    return false;
+  }
+}
 
-if (isLive && !wasLive) {
-  const text =
-    "🔴 <b>Bodun4ik_ вийшов у TikTok LIVE!</b>\n\n" +
-    "🎮 Заходь на стрім та підтримай ❤️\n\n" +
-    "▶️ <a href=\"https://www.tiktok.com/@bodun4ik_\">ДИВИТИСЯ LIVE</a>";
+const live = await isLive();
 
-  const url =
-    `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
+console.log("LIVE:", live);
 
-  await fetch(url, {
+if (live && !wasLive) {
+  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
       chat_id: TELEGRAM_CHAT_ID,
-      text: text,
       parse_mode: "HTML",
-      disable_web_page_preview: false
+      text:
+`🔴 <b>Bodun4ik_ почав TikTok LIVE!</b>
+
+🎮 Заходь підтримати!
+
+https://www.tiktok.com/@${USERNAME}/live`
     })
   });
 
-  console.log("Telegram notification sent!");
+  console.log("Повідомлення відправлено.");
 }
 
 fs.writeFileSync(
-  stateFile,
-  JSON.stringify({ wasLive: isLive }, null, 2)
+  STATE_FILE,
+  JSON.stringify({ wasLive: live }, null, 2)
 );
