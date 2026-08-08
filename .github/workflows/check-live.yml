@@ -2,7 +2,7 @@ name: Check TikTok LIVE
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "0/5 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -42,7 +42,5 @@ jobs:
           fi
 
           git commit -m "Update TikTok LIVE state"
-
           git pull --rebase origin main
-
           git push origin main
