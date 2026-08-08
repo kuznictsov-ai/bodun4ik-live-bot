@@ -31,7 +31,7 @@ jobs:
         run: node index.js
 
       - name: Save state
-        run: |
+       run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -39,7 +39,11 @@ jobs:
 
           if git diff --cached --quiet; then
             echo "No state changes."
-          else
-            git commit -m "Update TikTok LIVE state"
-            git push
+            exit 0
           fi
+
+          git commit -m "Update TikTok LIVE state"
+
+          git pull --rebase origin main
+
+          git push origin HEAD:main
