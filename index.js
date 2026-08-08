@@ -1,70 +1,119 @@
+import { TikTokLiveConnection } from "tiktok-live-connector";
 import fs from "fs";
 
-const USERNAME = "bodun4ik_";
+const TIKTOK_USERNAME = "bodun4ik_";
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const TELEGRAM_CHAT_ID = "@Bodun4ik_Live";
 
 const STATE_FILE = "state.json";
 
+if (!TELEGRAM_TOKEN) {
+  throw new Error("TELEGRAM_TOKEN is not configured");
+}
+
+// -------------------------
+// Load previous state
+// -------------------------
+
 let wasLive = false;
 
 if (fs.existsSync(STATE_FILE)) {
   try {
-    wasLive = JSON.parse(fs.readFileSync(STATE_FILE)).wasLive ?? false;
-  } catch {}
-}
-
-async function isLive() {
-  try {
-    const res = await fetch(
-      `https://www.tiktok.com/@${USERNAME}/live`,
-      {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36"
-        }
-      }
+    const state = JSON.parse(
+      fs.readFileSync(STATE_FILE, "utf8")
     );
 
-    const html = await res.text();
-
-    return (
-      html.includes('"status":2') ||
-      html.includes('"LIVE"') ||
-      html.includes('"liveRoomId"')
-    );
-  } catch (e) {
-    console.log(e);
-    return false;
+    wasLive = state.wasLive === true;
+  } catch (error) {
+    console.log("Could not read state.json. Starting with wasLive=false.");
+    wasLive = false;
   }
 }
 
-const live = await isLive();
+// -------------------------
+// Check TikTok LIVE
+// -------------------------
 
-console.log("LIVE:", live);
+let isLive = false;
 
-if (live && !wasLive) {
-  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+try {
+  const connection = new TikTokLiveConnection(
+    TIKTOK_USERNAME,
+    {
+      processInitialData: false,
+      fetchRoomInfoOnConnect: false
+    }
+  );
+
+  isLive = await connection.fetchIsLive();
+
+  console.log(`TikTok LIVE: ${isLive}`);
+} catch (error) {
+  console.error("TikTok check failed:");
+  console.error(error);
+
+  // Do NOT send a Telegram notification if TikTok check failed.
+  process.exit(1);
+}
+
+// -------------------------
+// Send Telegram notification
+// only when state changes:
+// false -> true
+// -------------------------
+
+if (isLive && !wasLive) {
+  console.log("LIVE started! Sending Telegram notification...");
+
+  const telegramUrl =
+    `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
+
+  const response = await fetch(telegramUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
       chat_id: TELEGRAM_CHAT_ID,
-      parse_mode: "HTML",
       text:
-`🔴 <b>Bodun4ik_ почав TikTok LIVE!</b>
-
-🎮 Заходь підтримати!
-
-https://www.tiktok.com/@${USERNAME}/live`
+        "🔴 <b>Bodun4ik_ вийшов у TikTok LIVE!</b>\n\n" +
+        "🎮 Заходь на стрім та підтримай ❤️\n\n" +
+        "▶️ <a href=\"https://www.tiktok.com/@bodun4ik_/live\">ДИВИТИСЯ LIVE</a>",
+      parse_mode: "HTML",
+      disable_web_page_preview: false
     })
   });
 
-  console.log("Повідомлення відправлено.");
+  const result = await response.json();
+
+  if (!response.ok || !result.ok) {
+    console.error("Telegram API error:");
+    console.error(result);
+
+    throw new Error("Telegram notification failed");
+  }
+
+  console.log("Telegram notification sent successfully!");
+} else if (isLive && wasLive) {
+  console.log("Still LIVE. Notification already sent.");
+} else {
+  console.log("Not LIVE.");
 }
+
+// -------------------------
+// Save current state
+// -------------------------
 
 fs.writeFileSync(
   STATE_FILE,
-  JSON.stringify({ wasLive: live }, null, 2)
+  JSON.stringify(
+    {
+      wasLive: isLive,
+      checkedAt: new Date().toISOString()
+    },
+    null,
+    2
+  )
 );
+
+console.log("State saved.");
