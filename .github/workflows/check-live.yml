@@ -1,33 +1,65 @@
 name: Check TikTok LIVE
 
 on:
-  schedule:
-    - cron: "0/5 * * * *"
   workflow_dispatch:
 
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tiktok-live-check
+  cancel-in-progress: false
+
 jobs:
-  check:
+  check-live:
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: write
-
     steps:
+
+      # ------------------------------------------------------
+      # CHECKOUT
+      # ------------------------------------------------------
+
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ------------------------------------------------------
+      # NODE.JS
+      # ------------------------------------------------------
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+
+      # ------------------------------------------------------
+      # INSTALL
+      # ------------------------------------------------------
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+
+      # ------------------------------------------------------
+      # CHECK TIKTOK LIVE
+      # ------------------------------------------------------
 
       - name: Check TikTok LIVE
         env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-        run: node index.js
+          TIKTOK_USERNAME: ${{ secrets.TIKTOK_USERNAME }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          node index.js
+
+      # ------------------------------------------------------
+      # SAVE STATE
+      # ------------------------------------------------------
 
       - name: Save state
         run: |
@@ -37,10 +69,12 @@ jobs:
           git add state.json
 
           if git diff --cached --quiet; then
-            echo "No state changes."
+            echo "State has not changed."
             exit 0
           fi
 
-          git commit -m "Update TikTok LIVE state"
+          git commit -m "chore: update TikTok LIVE state"
+
           git pull --rebase origin main
-          git push origin main
+
+          git push origin HEAD:main
