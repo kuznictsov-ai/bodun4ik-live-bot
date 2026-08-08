@@ -1,7 +1,15 @@
 {
-  "name": "bodun4ik-live-bot",
+  "name": "tiktok-live-bot",
   "version": "1.0.0",
-  "type": "module",
+  "description": "TikTok LIVE checker with Telegram notifications",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "check": "node index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "tiktok-live-connector": "2.4.3"
   }
