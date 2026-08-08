@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       # ------------------------------------------------------
       # CHECKOUT
       # ------------------------------------------------------
@@ -37,11 +38,11 @@ jobs:
           node-version: 20
 
       # ------------------------------------------------------
-      # INSTALL
+      # INSTALL DEPENDENCIES
       # ------------------------------------------------------
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-package-lock
 
       # ------------------------------------------------------
       # CHECK TIKTOK LIVE
@@ -54,24 +55,37 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: node index.js
 
-  # ------------------------------------------------------
-  # SAVE STATE
-  # ------------------------------------------------------
+      # ------------------------------------------------------
+      # SAVE STATE
+      # ------------------------------------------------------
 
-  - name: Save state
-    run: |
-      git config user.name "github-actions[bot]"
-      git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Save state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      git add state.json
+          # Зберігаємо новий state, який створив index.js
+          cp state.json /tmp/state.json
 
-      if git diff --cached --quiet; then
-        echo "State has not changed."
-        exit 0
-      fi
+          # Отримуємо найсвіжіший main
+          git fetch origin main
 
-      git commit -m "chore: update TikTok LIVE state"
+          # Переходимо на найсвіжіший main
+          git reset --hard origin/main
 
-      git pull --rebase -X theirs origin main
+          # Повертаємо новий state
+          cp /tmp/state.json state.json
 
-      git push origin HEAD:main
+          # Перевіряємо зміни
+          git add state.json
+
+          if git diff --cached --quiet; then
+            echo "State has not changed."
+            exit 0
+          fi
+
+          # Створюємо коміт
+          git commit -m "chore: update TikTok LIVE state"
+
+          # Відправляємо
+          git push origin HEAD:main
