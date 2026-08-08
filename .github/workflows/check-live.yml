@@ -18,7 +18,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       # ------------------------------------------------------
       # CHECKOUT
       # ------------------------------------------------------
@@ -42,7 +41,7 @@ jobs:
       # ------------------------------------------------------
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       # ------------------------------------------------------
       # CHECK TIKTOK LIVE
@@ -53,8 +52,7 @@ jobs:
           TIKTOK_USERNAME: ${{ secrets.TIKTOK_USERNAME }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          node index.js
+        run: node index.js
 
       # ------------------------------------------------------
       # SAVE STATE
