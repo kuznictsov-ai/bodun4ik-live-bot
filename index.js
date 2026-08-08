@@ -2,19 +2,20 @@ const fs = require("fs");
 const path = require("path");
 const https = require("https");
 
+const { TikTokLiveConnection } = require("tiktok-live-connector");
+
 // ============================================================
 // SETTINGS
 // ============================================================
 
 const TIKTOK_USERNAME = process.env.TIKTOK_USERNAME;
-
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 const STATE_FILE = path.join(__dirname, "state.json");
 
 // ============================================================
-// CHECK ENV
+// CHECK ENVIRONMENT
 // ============================================================
 
 if (!TIKTOK_USERNAME) {
@@ -32,6 +33,8 @@ if (!TELEGRAM_CHAT_ID) {
     process.exit(1);
 }
 
+console.log("Environment variables OK.");
+
 // ============================================================
 // STATE
 // ============================================================
@@ -39,8 +42,11 @@ if (!TELEGRAM_CHAT_ID) {
 function loadState() {
     try {
         if (!fs.existsSync(STATE_FILE)) {
+            console.log("state.json does not exist. Using default state.");
+
             return {
-                wasLive: false
+                wasLive: false,
+                checkedAt: null
             };
         }
 
@@ -48,21 +54,25 @@ function loadState() {
         const state = JSON.parse(data);
 
         return {
-            wasLive: Boolean(state.wasLive)
+            wasLive: Boolean(state.wasLive),
+            checkedAt: state.checkedAt || null
         };
+
     } catch (error) {
         console.log("Could not read state.json.");
         console.log("Using default state.");
 
         return {
-            wasLive: false
+            wasLive: false,
+            checkedAt: null
         };
     }
 }
 
 function saveState(wasLive) {
     const state = {
-        wasLive: Boolean(wasLive)
+        wasLive: Boolean(wasLive),
+        checkedAt: new Date().toISOString()
     };
 
     fs.writeFileSync(
@@ -80,6 +90,7 @@ function saveState(wasLive) {
 
 function sendTelegramMessage(message) {
     return new Promise((resolve, reject) => {
+
         const postData = JSON.stringify({
             chat_id: TELEGRAM_CHAT_ID,
             text: message,
@@ -96,14 +107,16 @@ function sendTelegramMessage(message) {
             }
         };
 
-        const req = https.request(options, (res) => {
+        const request = https.request(options, (response) => {
+
             let body = "";
 
-            res.on("data", (chunk) => {
+            response.on("data", (chunk) => {
                 body += chunk;
             });
 
-            res.on("end", () => {
+            response.on("end", () => {
+
                 try {
                     const result = JSON.parse(body);
 
@@ -119,8 +132,12 @@ function sendTelegramMessage(message) {
                         return;
                     }
 
+                    console.log("Telegram API response: OK");
+
                     resolve(result);
+
                 } catch (error) {
+
                     reject(
                         new Error(
                             `Invalid Telegram response: ${body}`
@@ -130,12 +147,12 @@ function sendTelegramMessage(message) {
             });
         });
 
-        req.on("error", (error) => {
+        request.on("error", (error) => {
             reject(error);
         });
 
-        req.write(postData);
-        req.end();
+        request.write(postData);
+        request.end();
     });
 }
 
@@ -144,15 +161,10 @@ function sendTelegramMessage(message) {
 // ============================================================
 
 async function checkTikTokLive() {
+
     console.log(
         `Checking TikTok LIVE for @${TIKTOK_USERNAME}...`
     );
-
-    // tiktok-live-connector 2.4.3 uses ESM,
-    // so we use dynamic import instead of require().
-    const {
-        TikTokLiveConnection
-    } = await import("tiktok-live-connector");
 
     const connection = new TikTokLiveConnection(
         TIKTOK_USERNAME,
@@ -162,16 +174,21 @@ async function checkTikTokLive() {
     );
 
     try {
+
         const isLive = await connection.fetchIsLive();
 
         console.log(`TikTok LIVE: ${isLive}`);
 
         return Boolean(isLive);
-    } catch (error) {
-        console.error("TikTok check failed:");
-        console.error(error?.message || error);
 
-        // Не змінюємо state при помилці TikTok.
+    } catch (error) {
+
+        console.error("TikTok check failed:");
+
+        console.error(
+            error?.message || error
+        );
+
         throw error;
     }
 }
@@ -181,10 +198,15 @@ async function checkTikTokLive() {
 // ============================================================
 
 async function main() {
+
     console.log("========================================");
     console.log("TikTok LIVE checker");
     console.log(`Username: @${TIKTOK_USERNAME}`);
     console.log("========================================");
+
+    // --------------------------------------------------------
+    // LOAD PREVIOUS STATE
+    // --------------------------------------------------------
 
     const previousState = loadState();
 
@@ -192,11 +214,18 @@ async function main() {
         `Previous state: ${previousState.wasLive}`
     );
 
+    // --------------------------------------------------------
+    // CHECK TIKTOK
+    // --------------------------------------------------------
+
     let isLive;
 
     try {
+
         isLive = await checkTikTokLive();
+
     } catch (error) {
+
         console.error(
             "Unable to reliably check TikTok LIVE."
         );
@@ -208,28 +237,35 @@ async function main() {
         process.exit(1);
     }
 
-    // ========================================================
+    // --------------------------------------------------------
     // OFFLINE -> LIVE
-    // ========================================================
+    // --------------------------------------------------------
 
     if (isLive && !previousState.wasLive) {
+
+        console.log("========================================");
         console.log("LIVE STARTED!");
-        console.log(
-            "Sending Telegram notification..."
-        );
+        console.log("========================================");
 
         const message =
             `🔴 TikTok LIVE розпочався!\n\n` +
             `@${TIKTOK_USERNAME}\n\n` +
             `👉 https://www.tiktok.com/@${TIKTOK_USERNAME}/live`;
 
+        console.log(
+            "Sending Telegram notification..."
+        );
+
         try {
+
             await sendTelegramMessage(message);
 
             console.log(
                 "Telegram notification sent successfully!"
             );
+
         } catch (error) {
+
             console.error(
                 "Telegram notification failed:"
             );
@@ -239,40 +275,44 @@ async function main() {
             );
 
             // Не записуємо LIVE=true,
-            // якщо Telegram не прийняв повідомлення.
+            // щоб наступний запуск спробував ще раз.
+
             process.exit(1);
         }
     }
 
-    // ========================================================
+    // --------------------------------------------------------
     // LIVE -> OFFLINE
-    // ========================================================
+    // --------------------------------------------------------
 
     if (!isLive && previousState.wasLive) {
+
         console.log("LIVE ended.");
     }
 
-    // ========================================================
+    // --------------------------------------------------------
     // LIVE -> LIVE
-    // ========================================================
+    // --------------------------------------------------------
 
     if (isLive && previousState.wasLive) {
+
         console.log(
             "Still LIVE. No notification needed."
         );
     }
 
-    // ========================================================
+    // --------------------------------------------------------
     // OFFLINE -> OFFLINE
-    // ========================================================
+    // --------------------------------------------------------
 
     if (!isLive && !previousState.wasLive) {
+
         console.log("Not LIVE.");
     }
 
-    // ========================================================
+    // --------------------------------------------------------
     // SAVE STATE
-    // ========================================================
+    // --------------------------------------------------------
 
     saveState(isLive);
 
@@ -284,8 +324,12 @@ async function main() {
 // ============================================================
 
 main().catch((error) => {
+
     console.error("Fatal error:");
-    console.error(error);
+
+    console.error(
+        error?.message || error
+    );
 
     process.exit(1);
 });
