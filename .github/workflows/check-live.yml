@@ -4,7 +4,9 @@ on:
   workflow_dispatch:
 
   schedule:
-    - cron: "*/5 * * * *"
+    # Запуск кожні 5 хвилин, але не на початку години.
+    # :02, :07, :12, :17, :22, :27, :32, :37, :42, :47, :52, :57
+    - cron: "2-59/5 * * * *"
 
 permissions:
   contents: write
@@ -38,7 +40,7 @@ jobs:
           node-version: 20
 
       # ------------------------------------------------------
-      # INSTALL DEPENDENCIES
+      # INSTALL
       # ------------------------------------------------------
 
       - name: Install dependencies
@@ -64,28 +66,29 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Зберігаємо новий state, який створив index.js
+          # Зберігаємо state, який створив index.js
           cp state.json /tmp/state.json
 
-          # Отримуємо найсвіжіший main
+          # Отримуємо останній стан main
           git fetch origin main
 
-          # Переходимо на найсвіжіший main
+          # Переходимо на актуальний main
           git reset --hard origin/main
 
-          # Повертаємо новий state
+          # Повертаємо свіжий state
           cp /tmp/state.json state.json
 
-          # Перевіряємо зміни
+          # Додаємо state
           git add state.json
 
+          # Якщо нічого не змінилося — завершуємо
           if git diff --cached --quiet; then
             echo "State has not changed."
             exit 0
           fi
 
-          # Створюємо коміт
+          # Коміт
           git commit -m "chore: update TikTok LIVE state"
 
-          # Відправляємо
+          # Відправляємо state назад
           git push origin HEAD:main
